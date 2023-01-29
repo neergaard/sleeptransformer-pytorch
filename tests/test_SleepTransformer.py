@@ -1,5 +1,6 @@
 import torch
 
+from sleeptransformer.loss import SequenceLoss
 from sleeptransformer.models import SleepTransformer
 from sleeptransformer.models.epoch_transformer import EpochTransformer
 from sleeptransformer.models.sequence_transformer import SequenceTransformer
@@ -14,21 +15,26 @@ class TestSleepTransformer:
     sequence_transformer = SequenceTransformer(
         fc_dim=1024, n_heads=8, dropout=0.1, n_layers=4, input_dim=F, hidden_dim=1024, n_classes=K
     )
+    sleep_transformer = SleepTransformer(
+        epoch_transformer=epoch_transformer,
+        sequence_transformer=sequence_transformer,
+        loss_fn=SequenceLoss,
+        optimizer_params=dict(lr=1e-4),
+    )
 
     def test_instance(self):
-
-        sleep_transformer = SleepTransformer(
-            epoch_transformer=self.epoch_transformer, sequence_transformer=self.sequence_transformer
-        )
-        assert sleep_transformer
+        assert self.sleep_transformer
 
     def test_forward(self):
-        sleep_transformer = SleepTransformer(
-            epoch_transformer=self.epoch_transformer, sequence_transformer=self.sequence_transformer
-        )
         X = torch.randn((self.N, self.L, self.T, self.F))
 
-        y, alpha = sleep_transformer(X)
+        y, alpha = self.sleep_transformer(X)
 
         assert y.shape == (self.N, self.L, self.K)
         assert alpha.shape == (self.N, self.L, self.T)
+
+    def test_confidence(self):
+        N, L, K = 32, 21, 5
+        y_pred = torch.rand((N, L, K))
+        conf = self.sleep_transformer.compute_confidence(y_pred)
+        assert conf.shape == (N, L)
