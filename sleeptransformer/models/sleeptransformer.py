@@ -1,6 +1,7 @@
 import torch
 from einops import rearrange, reduce
 from pytorch_lightning import LightningModule
+from pytorch_lightning.cli import instantiate_class
 
 from sleeptransformer.loss.base_loss import BaseLoss
 from sleeptransformer.models.base_transformer import BaseTransformer
@@ -8,12 +9,17 @@ from sleeptransformer.models.base_transformer import BaseTransformer
 
 class SleepTransformer(LightningModule):
     def __init__(
-        self, epoch_transformer: BaseTransformer, sequence_transformer: BaseTransformer, loss_fn: BaseLoss
+        self,
+        epoch_transformer: BaseTransformer,
+        sequence_transformer: BaseTransformer,
+        loss_fn: BaseLoss,
+        optimizer_params: dict,
     ) -> None:
         super().__init__()
+        self.loss_fn = loss_fn
         self.epoch_transformer = epoch_transformer
         self.sequence_transformer = sequence_transformer
-        self.loss_fn = loss_fn
+        self.optimizer_params = optimizer_params
 
     def forward(self, X: torch.Tensor) -> torch.Tensor:
 
@@ -39,3 +45,6 @@ class SleepTransformer(LightningModule):
         loss = reduce(loss, "N L -> N", reduction="mean")
         return loss.mean()  # or .sum()
 
+    def configure_optimizers(self):
+        optimizer = instantiate_class(filter(lambda p: p.requires_grad, self.parameters()), self.optimizer_params)
+        return [optimizer]
