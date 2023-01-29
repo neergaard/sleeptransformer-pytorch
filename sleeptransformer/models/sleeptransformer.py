@@ -49,6 +49,20 @@ class SleepTransformer(LightningModule):
         h_y = y_pred * y_pred.log()
         return h_y.sum(dim=-1)
 
+    def shared_step(self, x: torch.Tensor, t: torch.Tensor) -> torch.Tensor:
+        z, alpha = self(x)
+        loss = self.compute_loss()
+        return loss
+
+    def training_step(self, batch: dict, batch_idx: int) -> torch.Tensor:
+        loss = self.shared_step(batch)
+        # self.log("loss/train", loss, on_step=True, on_epoch=True, prog_bar=True, batch_size=batch_size)
+        return loss
+
+    def validation_step(self, batch: dict, batch_idx: int) -> torch.Tensor:
+        loss = self.shared_step(batch)
+        return loss
+
     def configure_optimizers(self):
         optimizer = instantiate_class(filter(lambda p: p.requires_grad, self.parameters()), self.optimizer_params)
         return [optimizer]
