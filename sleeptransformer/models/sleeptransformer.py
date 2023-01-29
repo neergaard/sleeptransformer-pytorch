@@ -45,6 +45,10 @@ class SleepTransformer(LightningModule):
         loss = reduce(loss, "N L -> N", reduction="mean")
         return loss.mean()  # or .sum()
 
+    def compute_confidence(self, y_pred: torch.Tensor) -> torch.Tensor:
+        h_y = y_pred * y_pred.log()
+        return h_y.sum(dim=-1)
+
     def configure_optimizers(self):
         optimizer = instantiate_class(filter(lambda p: p.requires_grad, self.parameters()), self.optimizer_params)
         return [optimizer]
