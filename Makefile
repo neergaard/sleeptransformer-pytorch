@@ -1,6 +1,13 @@
 CONDA_NAME = sleeptransformer
 
 create_env:
+	conda create -n ${CONDA_NAME} python=3.10
+	conda install -n ${CONDA_NAME} black flake8 pytest
+	conda install -n ${CONDA_NAME} pytorch torchvision torchaudio pytorch-cuda=11.7 -c pytorch -c nvidia
+	conda install -n ${CONDA_NAME} pytorch-lightning einops -c conda-forge
+	# conda activate ${CONDA_NAME}
+
+create_env_macos:
 	export GRPC_PYTHON_BUILD_SYSTEM_OPENSSL=1
 	export GRPC_PYTHON_BUILD_SYSTEM_ZLIB=1
 	mamba create -n ${CONDA_NAME} python=3.10
