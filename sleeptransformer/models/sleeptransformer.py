@@ -1,3 +1,4 @@
+from typing import List, Tuple
 import torch
 from einops import rearrange, reduce
 from pytorch_lightning import LightningModule
@@ -21,7 +22,7 @@ class SleepTransformer(LightningModule):
         self.sequence_transformer = sequence_transformer
         self.optimizer_params = optimizer_params
 
-    def forward(self, X: torch.Tensor) -> torch.Tensor:
+    def forward(self, X: torch.Tensor) -> Tuple[torch.Tensor, List[torch.Tensor], List[torch.Tensor], torch.Tensor]:
 
         N, L, T, F = X.shape
         X = rearrange(X, "N L T F -> L N T F")
@@ -30,14 +31,14 @@ class SleepTransformer(LightningModule):
         output = []
         for x in X:
             output.append(self.epoch_transformer(x))
-        z, alpha = map(torch.stack, zip(*output))
+        z, epoch_att_weights, alpha = map(torch.stack, zip(*output))
         z = rearrange(z, "L N F -> N L F")
         alpha = rearrange(alpha, "L N T -> N L T")
 
         # Pass output vectors through Sequence Transformer
-        y = self.sequence_transformer(z)
+        y, seq_att_weights = self.sequence_transformer(z)
 
-        return y, alpha
+        return y, epoch_att_weights, seq_att_weights, alpha
 
     def compute_loss(self, y_pred: torch.Tensor, y_target: torch.Tensor) -> torch.tensor:
         y_pred = rearrange(y_pred, "N L K -> N K L")
@@ -50,7 +51,7 @@ class SleepTransformer(LightningModule):
         return h_y.sum(dim=-1)
 
     def shared_step(self, x: torch.Tensor, t: torch.Tensor) -> torch.Tensor:
-        z, alpha = self(x)
+        z, epoch_att_weights, seq_att_weights, alpha = self(x)
         loss = self.compute_loss()
         return loss
 

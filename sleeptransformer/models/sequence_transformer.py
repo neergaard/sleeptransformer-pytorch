@@ -15,9 +15,7 @@ class SequenceTransformer(BaseTransformer):
         n_classes: int,
         hidden_dim: int,
     ) -> None:
-        super().__init__(
-            n_heads=n_heads, dropout=dropout, n_layers=n_layers, input_dim=input_dim, hidden_dim=hidden_dim
-        )
+        super().__init__(n_heads=n_heads, dropout=dropout, n_layers=n_layers, input_dim=input_dim, hidden_dim=hidden_dim)
         self.fc_dim = fc_dim
         self.n_heads = n_heads
         self.dropout = dropout
@@ -38,9 +36,9 @@ class SequenceTransformer(BaseTransformer):
     def forward(self, X: torch.Tensor) -> None:
 
         # Pass the sequences through the Sequence Transformer
-        z = super().forward(X)
+        z, att_weights = super().forward(X)
 
         # Pass the outputs through the linear layers
         y = self.linear_layer(z)
 
-        return y
+        return y, att_weights
