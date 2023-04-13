@@ -14,7 +14,9 @@ class TestEpochTransformer:
         epoch_transformer = EpochTransformer(8, 0.1, 4, 128, 1024, 1024)
         X = torch.rand((N, T, F))
 
-        z, alpha = epoch_transformer(X)
+        z, att_weights, alpha = epoch_transformer(X)
 
         assert z.shape == (N, F)
+        for a in att_weights:
+            assert a.shape == (N, T, T)
         assert alpha.shape == (N, T)

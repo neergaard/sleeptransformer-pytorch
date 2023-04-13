@@ -18,6 +18,8 @@ class TestSequenceTransformer:
         )
         X = torch.rand((N, T, F))
 
-        y = sequence_transformer(X)
+        y, att_weights = sequence_transformer(X)
 
         assert y.shape == (N, T, K)
+        for a in att_weights:
+            assert a.shape == (N, T, T)

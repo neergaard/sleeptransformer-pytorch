@@ -9,9 +9,7 @@ from sleeptransformer.models.sequence_transformer import SequenceTransformer
 class TestSleepTransformer:
 
     N, L, T, F, K = 32, 21, 29, 128, 5
-    epoch_transformer = EpochTransformer(
-        n_heads=8, dropout=0.1, n_layers=4, input_dim=F, hidden_dim=1024, attention_dim=128
-    )
+    epoch_transformer = EpochTransformer(n_heads=8, dropout=0.1, n_layers=4, input_dim=F, hidden_dim=1024, attention_dim=128)
     sequence_transformer = SequenceTransformer(
         fc_dim=1024, n_heads=8, dropout=0.1, n_layers=4, input_dim=F, hidden_dim=1024, n_classes=K
     )
@@ -28,7 +26,7 @@ class TestSleepTransformer:
     def test_forward(self):
         X = torch.randn((self.N, self.L, self.T, self.F))
 
-        y, alpha = self.sleep_transformer(X)
+        y, epoch_att_weights, seq_att_weights, alpha = self.sleep_transformer(X)
 
         assert y.shape == (self.N, self.L, self.K)
         assert alpha.shape == (self.N, self.L, self.T)
