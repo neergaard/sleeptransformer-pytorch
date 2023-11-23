@@ -1,8 +1,9 @@
 import torch
 import torch.nn as nn
+from pytorch_lightning.core.mixins import HyperparametersMixin
 
 
-class BaseTransformer(nn.Module):
+class BaseTransformer(HyperparametersMixin, nn.Module):
     def __init__(
         self,
         n_heads: int,
@@ -12,18 +13,14 @@ class BaseTransformer(nn.Module):
         hidden_dim: int,
     ) -> None:
         super().__init__()
-        # self.n_heads = n_heads
-        # self.dropout = dropout
-        # self.n_layers = n_layers
-        # self.input_dim = input_dim
-        # self.hidden_dim = hidden_dim
+        self.save_hyperparameters()
 
         encoding_layer = nn.TransformerEncoderLayer(
             d_model=input_dim,
             nhead=n_heads,
             dim_feedforward=hidden_dim,
             dropout=dropout,
-            batch_first=True,
+            batch_first=False,
         )
         self.transformer_encoder = nn.TransformerEncoder(encoder_layer=encoding_layer, num_layers=n_layers)
         self.attention_weights_saver = SaveOutput()
@@ -33,8 +30,7 @@ class BaseTransformer(nn.Module):
                 module.register_forward_hook(self.attention_weights_saver)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-
-        B, T, F = x.shape
+        T, B, F = x.shape
 
         # Positional encoding
         z = self._positional_embedding(x)
@@ -42,18 +38,19 @@ class BaseTransformer(nn.Module):
         # run forward pass through transformer
         z = self.transformer_encoder(z)
 
-        att_weights = self.attention_weights_saver.outputs
+        att_weights = torch.stack(self.attention_weights_saver.outputs)
+        self.attention_weights_saver.clear()
 
         return z, att_weights
 
     def _positional_embedding(self, x: torch.Tensor) -> torch.Tensor:
-        p = torch.zeros_like(x).sum(0, keepdim=True)
-        _, T, F = x.shape
+        p = torch.zeros_like(x).sum(1, keepdim=True)
+        T, _, F = x.shape
         for j in torch.arange(0, F, dtype=int):
             if j % 2 == 0:
-                p[0, :, j] = torch.sin(torch.arange(0, T, dtype=int) / 10_000 ** (2 * j / F))
+                p[:, 0, j] = torch.sin(torch.arange(0, T, dtype=int) / 10_000 ** (2 * j / F))
             else:
-                p[0, :, j] = torch.cos(torch.arange(0, T, dtype=int) / 10_000 ** (2 * j / F))
+                p[:, 0, j] = torch.cos(torch.arange(0, T, dtype=int) / 10_000 ** (2 * j / F))
 
         return x + p.expand_as(x)
 

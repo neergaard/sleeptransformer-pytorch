@@ -1,5 +1,7 @@
 from typing import List, Tuple
+
 import torch
+from einops import rearrange
 
 from .attention import AttentionLayer
 from .base_transformer import BaseTransformer
@@ -19,9 +21,10 @@ class EpochTransformer(BaseTransformer):
 
     def forward(self, X: torch.Tensor) -> Tuple[torch.Tensor, List[torch.Tensor], torch.Tensor]:
 
-        z, att_weights = super().forward(X)
+        x_t, att_weights = super().forward(X)
 
         # Run forward pass through attention layer
-        z, alpha = self.attention_embedding(z)
+        T, N, F = x_t.shape
+        x, alpha = self.attention_embedding(rearrange(x_t, "T N F -> N T F"))
 
-        return z, att_weights, alpha
+        return x, att_weights, alpha
