@@ -1,0 +1,55 @@
+accelerator: auto
+accumulate_grad_batches: 1
+barebones: false
+benchmark: true
+callbacks:
+  - RichProgressBar
+  # - class_path: pytorch_lightning.callbacks.early_stopping.EarlyStopping
+  - class_path: sleeptransformer.callbacks.CustomEarlyStopping
+    init_args:
+      begin_after: 5000
+      monitor: loss/eval
+      patience: 20
+      mode: min
+      verbose: true
+  - class_path: pytorch_lightning.callbacks.RichModelSummary
+    init_args:
+      max_depth: 3
+  - class_path: pytorch_lightning.callbacks.ModelCheckpoint
+    init_args:
+      monitor: loss/eval
+      save_last: True
+check_val_every_n_epoch: 1
+default_root_dir: null
+detect_anomaly: false
+deterministic: false
+devices: auto
+enable_checkpointing: null
+enable_model_summary: null
+enable_progress_bar: null
+fast_dev_run: false
+gradient_clip_algorithm: null
+gradient_clip_val: null
+inference_mode: true
+limit_predict_batches: null
+limit_test_batches: null
+limit_train_batches: null
+limit_val_batches: null
+log_every_n_steps: null
+logger: null
+max_epochs: 1000
+max_steps: -1
+max_time: null
+min_epochs: null
+min_steps: null
+num_nodes: 1
+num_sanity_val_steps: null
+overfit_batches: 0.0
+plugins: null
+precision: 32-true
+profiler: null
+reload_dataloaders_every_n_epochs: 0
+strategy: auto
+sync_batchnorm: false
+use_distributed_sampler: false
+val_check_interval: 10000

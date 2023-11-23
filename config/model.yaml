@@ -1,0 +1,30 @@
+class_path: sleeptransformer.models.SleepTransformer
+init_args:
+  epoch_transformer:
+    class_path: sleeptransformer.models.epoch_transformer.EpochTransformer
+    init_args:
+      attention_dim: 64
+      dropout: 0.1
+      hidden_dim: 1024
+      input_dim: 128
+      n_heads: 8
+      n_layers: 4
+  loss_fn:
+    class_path: sleeptransformer.loss.SequenceLoss
+    init_args:
+      weight: null
+  optimizer:
+    name: torch.optim.Adam
+    weight_decay: 0.0
+    amsgrad: True
+    lr: 0.0001
+  sequence_transformer:
+    class_path: sleeptransformer.models.sequence_transformer.SequenceTransformer
+    init_args:
+      fc_dim: 1024
+      n_heads: 8
+      dropout: 0.1
+      n_layers: 4
+      input_dim: 128
+      hidden_dim: 1024
+      n_classes: 5

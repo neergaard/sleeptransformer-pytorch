@@ -1,0 +1,5 @@
+name: my_experiment
+project: sleeptransformer
+model: model.yaml
+data: data.yaml
+trainer: trainer.yaml

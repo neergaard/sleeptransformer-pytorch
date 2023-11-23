@@ -1,0 +1,27 @@
+class_path: sleeptransformer.data.stage_datamodule.SleepStageDataModule
+init_args:
+  batch_size: 32
+  cache_data: true
+  data_dir: data/processed/shhs
+  data_type: stft
+  fs: 100
+  n_eval: 100
+  n_jobs: -1
+  n_records: null
+  n_test: null
+  num_workers: 4
+  overfit: false
+  percent_eval: null
+  percent_test: 30
+  picks:
+    - c4
+  scaling: standard
+  seed: 1337
+  sequence_length: 21
+  transform:
+    # class_path: sleeptransformer.data.transforms.STFTTransform
+    # init_args:
+    #   fs: 100
+    #   segment_size: 200
+    #   step_size: 100
+    #   nfft: 256
