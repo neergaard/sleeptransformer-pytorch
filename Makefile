@@ -1,23 +1,17 @@
+.ONESHELL:
+.PHONY: create_preprocess_env create_env install_pytorch
+
+
 CONDA_NAME = sleeptransformer
 
-create_env:
-	conda create -n ${CONDA_NAME} python=3.10
-	conda install -n ${CONDA_NAME} black flake8 pytest
-	conda install -n ${CONDA_NAME} pytorch torchvision torchaudio pytorch-cuda=11.7 -c pytorch -c nvidia
-	conda install -n ${CONDA_NAME} pytorch-lightning einops -c conda-forge
-	# conda activate ${CONDA_NAME}
+create_preprocess_env:
+	mamba create -n ${CONDA_NAME} python=3.10 pandas h5py numpy scikit-learn ruby black flake8 pytest xmltodict; \
+	mamba install -y -n ${CONDA_NAME} -c conda-forge mne-base librosa rich ipympl jupyterlab einops; \
 
-create_env_macos:
-	export GRPC_PYTHON_BUILD_SYSTEM_OPENSSL=1
-	export GRPC_PYTHON_BUILD_SYSTEM_ZLIB=1
-	mamba create -n ${CONDA_NAME} python=3.10
-	mamba install -n ${CONDA_NAME} black flake8 pytest
-	mamba install -n ${CONDA_NAME} pytorch torchvision torchaudio -c pytorch
-	mamba install -n ${CONDA_NAME} pytorch-lightning einops -c conda-forge
-	conda activate ${CONDA_NAME}
+create_env: create_preprocess_env
+	mamba install -y -n ${CONDA_NAME} pytorch torchvision torchaudio pytorch-cuda=12.1 -c pytorch -c nvidia; \
+	mamba install -y -n ${CONDA_NAME} -c conda-forge pytorch-lightning; \
 
-del_env:
-ifeq (${CONDA_NAME},${CONDA_DEFAULT_ENV})
-	mamba deactivate
-endif
-	mamba env remove -n ${CONDA_NAME}
+install_pytorch: create_env
+	mamba install -y -n ${CONDA_NAME} -c pytorch -c nvidia pytorch torchvision torchaudio pytorch-cuda=11.7; \
+	mamba install -y -n ${CONDA_NAME} -c conda-forge pytorch-lightning; \
