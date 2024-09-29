@@ -48,7 +48,7 @@ class STFTTransform:
         return [F, T]
 
     def __call__(self, X: np.ndarray, annotations: Optional[np.ndarray] = None) -> np.ndarray:
-        Zxx = np.abs(self.transform_fn(X)) ** 2
-        Zxx = librosa.power_to_db(Zxx)
+        Zxx = np.abs(self.transform_fn(X))
+        Zxx = librosa.amplitude_to_db(Zxx)
 
         return Zxx[:, :, 1:]  # Remove DC component
