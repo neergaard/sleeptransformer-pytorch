@@ -4,6 +4,7 @@ import json
 import os
 from collections import Counter
 from pathlib import Path
+from typing import List, Union
 
 import mne
 from joblib import delayed
@@ -21,6 +22,7 @@ def get_edf_list(data_dir):
     else:
         print(f"{data_dir} is not a valid directory.")
         edf_files = []
+    print(f"Found {len(edf_files)} EDF files!")
     return edf_files
 
 
@@ -83,7 +85,23 @@ def get_all_channel_labels_with_counts(edf_list):
 #     return label_set
 
 
-def channel_mapper(edf_list, channel_labels, json_filename=None):
+def channel_mapper(
+    channel_labels: List[str],
+    data_dir: Path = None,
+    edf_list: List[Path] = None,
+    json_filename: Union[Path, str] = "channel_map.json",
+    force: bool = False,
+):
+    # Check if there already exists a channel mapper json
+    if len(list(data_dir.rglob("channel_map.json"))) == 1 and not force:
+        with open(list(data_dir.rglob("channel_map.json"))[0], "r") as fp:
+            channel_map = json.load(fp)
+        return channel_map
+
+    if edf_list is None and data_dir is not None:
+        edf_list = get_edf_list(data_dir)
+    elif edf_list is None and data_dir is None:
+        raise AssertionError(f"Please supply either a data directory with EDF files or a list of EDF files!")
 
     n_edfs = len(edf_list)
     if n_edfs == 0:
@@ -118,6 +136,7 @@ def channel_mapper(edf_list, channel_labels, json_filename=None):
                 channel_map[ch] = selected_labels
 
             if json_filename is not None:
+                json_filename = data_dir / json_filename
                 with open(json_filename, "w") as json_file:
                     json.dump(channel_map, json_file, indent=4, sort_keys=True)
                 print(json.dumps(channel_map))
