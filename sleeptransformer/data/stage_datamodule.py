@@ -69,7 +69,7 @@ class SleepStageDataModule(BaseDataModule):
             number_validation=self.hparams.n_eval,
             percent_test=self.hparams.percent_test,
             percent_validation=self.hparams.percent_eval,
-            seed=self.hparams.seed,
+            # seed=self.hparams.seed,
         )
         self.train_records = partitions["train"]
         self.eval_records = partitions["eval"] if not self.hparams.overfit else partitions["train"]
@@ -99,7 +99,7 @@ class SleepStageDataModule(BaseDataModule):
         if stage == "fit":
             self.train = SleepStageDataset(self.train_records, **self.dataset_kwargs)
             self.eval = SleepStageDataset(self.eval_records, **self.dataset_kwargs)
-        else:
+            # else:
             self.test = SleepStageDataset(self.test_records, **self.dataset_kwargs)
         self.output_dims = self.example_input_array.numpy().shape
 
@@ -109,6 +109,7 @@ class SleepStageDataModule(BaseDataModule):
             batch_size=self.hparams.batch_size,
             shuffle=True,
             num_workers=self.hparams.num_workers,
+            persistent_workers=True if self.hparams.num_workers > 0 else False,
             collate_fn=collate,
             pin_memory=True,
         )
@@ -119,6 +120,7 @@ class SleepStageDataModule(BaseDataModule):
             batch_size=self.hparams.batch_size,
             shuffle=False,
             num_workers=self.hparams.num_workers,
+            persistent_workers=True if self.hparams.num_workers > 0 else False,
             collate_fn=collate,
             pin_memory=True,
         )
@@ -129,6 +131,7 @@ class SleepStageDataModule(BaseDataModule):
             batch_size=self.hparams.batch_size,
             shuffle=False,
             num_workers=self.hparams.num_workers,
+            persistent_workers=True if self.hparams.num_workers > 0 else False,
             collate_fn=collate,
             pin_memory=True,
         )
