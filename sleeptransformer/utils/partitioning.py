@@ -15,7 +15,7 @@ def get_train_validation_test(
     number_test: Optional[int] = None,
     number_validation: Optional[int] = None,
     n_records: Optional[int] = None,
-    seed=None,
+    # seed=None,
 ) -> dict:
     if isinstance(h5_directory, list):
         records = h5_directory
@@ -25,16 +25,16 @@ def get_train_validation_test(
         records = [x for x in os.listdir(h5_directory) if x != ".cache"]
     records = sorted(records)[:n_records]
     assert len(records) > 0, "No records found!"
-    logger.info(f'Found {len(records)} records, shuffling...')
-    random.seed(seed)
-    random.shuffle(records)
+    logger.info(f"Found {len(records)} records, shuffling...")
+    # random.seed(seed)
+    # random.shuffle(records)
     if number_test is not None:
         index_test = number_test
     elif percent_test is not None:
         index_test = int(len(records) * percent_test / 100)
     else:
         ValueError("Please supply either the number or percentage of test examples!")
-    logger.info(f'Using {index_test} records for testing.')
+    logger.info(f"Using {index_test} records for testing.")
     test = records[:index_test]
     records_train = records[index_test:]
     random.shuffle(records_train)
@@ -44,8 +44,8 @@ def get_train_validation_test(
         index_validation = int(len(records_train) * percent_validation / 100)
     else:
         ValueError("Please supply either the number or the percentage of validation examples!")
-    logger.info(f'Using {index_validation} records for validation.')
+    logger.info(f"Using {index_validation} records for validation.")
     validation = records_train[:index_validation]
-    logger.info(f'Using {len(records_train) - index_validation} records for training.')
+    logger.info(f"Using {len(records_train) - index_validation} records for training.")
     train = records_train[index_validation:]
     return {"train": train, "eval": validation, "test": test}
