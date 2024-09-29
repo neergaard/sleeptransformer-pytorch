@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sleeptransformer"
+version = "0.1"
+description = "A PyTorch implementation of the SleepTransformer model."
+authors = [
+  { name = "Alexander Neergaard Zahid", email = "aneol@dtu.dk" },
+]
+license = { file = "LICENSE" }
+readme = "README.md"
+requires-python = ">=3.11"
+dynamic = ["dependencies"]
+
+[tool.setuptools]
+packages = ["sleeptransformer"]
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}
+
+[tool.black]
+line-length = 150
+
+[project.scripts]

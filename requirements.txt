@@ -1,0 +1,14 @@
+einops
+h5py
+jsonargparse[signatures]
+librosa
+lightning
+mne
+numpy
+pandas
+rich
+scikit-learn
+torch
+torchaudio
+torchvision
+xmltodict
