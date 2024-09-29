@@ -1,7 +1,7 @@
 import json
 import os
 from pathlib import Path
-from typing import Literal, Optional
+from typing import List, Literal, Optional
 
 import h5py
 import mne
@@ -13,6 +13,8 @@ from scipy.signal import resample_poly
 from sklearn.preprocessing import RobustScaler
 
 from sleeptransformer.data import transforms
+from sleeptransformer.utils.channel_mapper import channel_mapper as get_channel_mapper
+from sleeptransformer.utils.channel_mapper import get_edf_list
 from sleeptransformer.utils.filters import ButterworthFilter
 from sleeptransformer.utils.logger import get_logger
 from sleeptransformer.utils.parallel_bar import ParallelExecutor
@@ -32,12 +34,12 @@ EXTRACTED_CHANNELS = ["C3", "C4", "EOGL", "EOGR", "EMG"]
 eeg_filter = ButterworthFilter(order=2, fc=[0.3, 35], type="band")
 eog_filter = ButterworthFilter(order=2, fc=[0.3, 35], type="band")
 emg_filter = ButterworthFilter(order=4, fc=[10], type="highpass")
-signal_labels_json_path = Path("data/hpc/montage_code/shhs.json")
-if signal_labels_json_path.exists():
-    with open(signal_labels_json_path, "r") as (f):
-        channel_dict = json.load(f)
-    # channel_categories = channel_dict["categories"]
-    channel_categories = ["C4"]
+# signal_labels_json_path = Path("data/pc/montage_code/shhs.json")
+# if signal_labels_json_path.exists():
+#     with open(signal_labels_json_path, "r") as (f):
+#         channel_dict = json.load(f)
+#     # channel_categories = channel_dict["categories"]
+    # channel_categories = ["C4"]
 channel_filters = {
     "C3": eeg_filter,
     "C4": eeg_filter,
@@ -70,6 +72,7 @@ def process_file(
     annotation_directory: str,
     output_dir: str,
     output_fs: int,
+    channel_map: dict,
     transform: Literal["none", "stft", "cwt", "multitaper"] = "none",
     duration: Optional[float] = None,
     overlap: Optional[float] = None,
@@ -98,9 +101,9 @@ def process_file(
         k: mne.io.read_raw_edf(
             edf_filename,
             verbose=False,
-            include=[ch for ch in labels if ch in channel_dict[k]],
+            include=[ch for ch in labels if ch in channel_map[k]],
         )
-        for k in channel_categories
+        for k in channel_map['categories']
     }
 
     try:
@@ -114,97 +117,97 @@ def process_file(
     # Resample and filter
     for chn in data.keys():
         data[chn] = resample_poly(data[chn], output_fs, fs[chn], axis=1)
-        data[chn] = channel_filters[chn](data[chn], output_fs)
+        # data[chn] = channel_filters[chn](data[chn], output_fs)
+
+    # Get sleep stage annotations
+    stages_df = annotations.query('EventType == "Stages|Stages"')[["EventConcept", "Start", "Duration"]]
+    stages = [
+        (stage, start, dur)
+        for stage, start, dur in zip(
+            stages_df["EventConcept"].str.split("|", expand=True)[0].str.split(" sleep", expand=True)[0].to_list(),
+            stages_df["Start"].astype(float).to_list(),
+            stages_df["Duration"].astype(float).to_list(),
+        )
+    ]
+
+    # Save sleep stages in dense format.
+    # Here, we map {W, N1, N2, N3, R} to {0, 1, 2, 3, 4}
+    stage_dict = {
+        "Wake": 0,
+        "Stage 1": 1,
+        "Stage 2": 2,
+        "Stage 3": 3,
+        "Stage 4": 3,
+        "REM": 4,
+        "MOVEMENT": 7,
+        "Movement": 7,
+        "UNKNOWN": 7,
+        "Unscored": 7,
+    }
+    stages_dense = np.concatenate([np.repeat(stage_dict[s[0]], s[-1]) for s in stages])
+    # h5.create_dataset(f"stages", data=stages_dense)
+
+    info = mne.create_info(list(data.keys()), output_fs, verbose=False)
+    d = np.concatenate([v for v in data.values()])
+    stage_annot = mne.Annotations(
+        onset=[s[1] for s in stages],
+        duration=[s[2] for s in stages],
+        description=[s[0] for s in stages],
+    )
+
+    annotation_desc_2_event_id = {
+        "Wake": 0,
+        "Stage 1": 1,
+        "Stage 2": 2,
+        "Stage 3": 3,
+        "REM": 4,
+    }
+
+    # Crop all wake except 30 min before and after
+    if stage_annot[0]["description"] == "Wake":
+        crop_prior = True
+    else:
+        crop_prior = False
+    if stage_annot[-1]["description"] == "Wake":
+        crop_post = True
+    else:
+        crop_post = False
+    stage_annot.crop(
+        max(0, stage_annot[1]["onset"] - 30 * 60) if crop_prior else None,
+        min(stage_annot.duration.sum(), stage_annot[-2]["onset"] + 30 * 60) if crop_post else None,
+    )
+
+    # Create Raw object and set annotations
+    raw = mne.io.RawArray(d, info, verbose=False)
+    raw.set_annotations(stage_annot)
+
+    # Define events
+    stage_events, _ = mne.events_from_annotations(raw, event_id=annotation_desc_2_event_id, chunk_duration=30.0)
+    event_id = {"Wake": 0, "N1": 1, "N2": 2, "N3": 3, "REM": 4}
+
+    # Create Epochs object based on events
+    epoched = mne.Epochs(
+        raw=raw,
+        events=stage_events,
+        event_id={k: v for k, v in event_id.items() if v in np.unique(stage_events[:, -1])},
+        tmin=0,
+        tmax=30.0 - 1 / raw.info["sfreq"],
+        baseline=None,
+    )
+
+    # Possibly transform data
+    X = epoched.get_data()
+    N, C, T = X.shape
+    assert C == 1, f"This currently only works for single EEG, got C={C}."
+    if transform == "stft":
+        transformer = transforms.STFTTransform(
+            fs=output_fs, segment_size=2 * output_fs, step_size=output_fs, nfft=256
+        )
+        X = transformer(X)
 
     # Write to H5
     with h5py.File(h5_filename, "w") as h5:
-        # Get sleep stage annotations
-        stages_df = annotations.query('EventType == "Stages|Stages"')[["EventConcept", "Start", "Duration"]]
-        stages = [
-            (stage, start, dur)
-            for stage, start, dur in zip(
-                stages_df["EventConcept"].str.split("|", expand=True)[0].str.split(" sleep", expand=True)[0].to_list(),
-                stages_df["Start"].astype(float).to_list(),
-                stages_df["Duration"].astype(float).to_list(),
-            )
-        ]
 
-        # Save sleep stages in dense format.
-        # Here, we map {W, N1, N2, N3, R} to {0, 1, 2, 3, 4}
-        stage_dict = {
-            "Wake": 0,
-            "Stage 1": 1,
-            "Stage 2": 2,
-            "Stage 3": 3,
-            "Stage 4": 3,
-            "REM": 4,
-            "MOVEMENT": 7,
-            "Movement": 7,
-            "UNKNOWN": 7,
-            "Unscored": 7,
-        }
-        stages_dense = np.concatenate([np.repeat(stage_dict[s[0]], s[-1]) for s in stages])
-        # h5.create_dataset(f"stages", data=stages_dense)
-
-        info = mne.create_info(list(data.keys()), output_fs, verbose=False)
-        d = np.concatenate([v for v in data.values()])
-        stage_annot = mne.Annotations(
-            onset=[s[1] for s in stages],
-            duration=[s[2] for s in stages],
-            description=[s[0] for s in stages],
-        )
-
-        annotation_desc_2_event_id = {
-            "Wake": 0,
-            "Stage 1": 1,
-            "Stage 2": 2,
-            "Stage 3": 3,
-            "REM": 4,
-        }
-
-        # Crop all wake except 30 min before and after
-        if stage_annot[0]["description"] == "Wake":
-            crop_prior = True
-        else:
-            crop_prior = False
-        if stage_annot[-1]["description"] == "Wake":
-            crop_post = True
-        else:
-            crop_post = False
-        stage_annot.crop(
-            max(0, stage_annot[1]["onset"] - 30 * 60) if crop_prior else None,
-            min(stage_annot.duration.sum(), stage_annot[-2]["onset"] + 30 * 60) if crop_post else None,
-        )
-
-        # Create Raw object and set annotations
-        raw = mne.io.RawArray(d, info, verbose=False)
-        raw.set_annotations(stage_annot)
-
-        # Define events
-        stage_events, _ = mne.events_from_annotations(raw, event_id=annotation_desc_2_event_id, chunk_duration=30.0)
-        event_id = {"Wake": 0, "N1": 1, "N2": 2, "N3": 3, "REM": 4}
-
-        # Create Epochs object based on events
-        epoched = mne.Epochs(
-            raw=raw,
-            events=stage_events,
-            event_id={k: v for k, v in event_id.items() if v in np.unique(stage_events[:, -1])},
-            tmin=0,
-            tmax=30.0 - 1 / raw.info["sfreq"],
-            baseline=None,
-        )
-
-        # Possibly transform data
-        X = epoched.get_data()
-        N, C, T = X.shape
-        assert C == 1, f"This currently only works for single EEG, got C={C}."
-        if transform == "stft":
-            transformer = transforms.STFTTransform(
-                fs=output_fs, segment_size=2 * output_fs, step_size=output_fs, nfft=256
-            )
-            X = transformer(X)
-
-        # Save everything to disk
         dshape = X.shape
         h5.create_dataset(
             "data/unscaled",
@@ -229,12 +232,13 @@ def process_shhs(
     subjects: Optional[int],
     splits: int,
     current_split: int,
+    channels: List[str] = EXTRACTED_CHANNELS,
     *args,
     **kwargs,
 ):
     logger.info("Converting EDF and annotations to standard H5 file")
-    logger.info(f"Input directory (EDF and annotation file location): {data_dir}")
-    logger.info(f"Output directory (H5 file location): {output_dir}")
+    logger.info(f'Input directory (EDF and annotation file location): "{data_dir}"')
+    logger.info(f'Output directory (H5 file location): "{output_dir}"')
 
     if not output_dir.exists():
         logger.info(f"Creating directory: {output_dir}")
@@ -244,6 +248,11 @@ def process_shhs(
     annotation_directory = data_dir / ANNOTATION_VISIT1_DIRECTORY
     records = sorted([x.split(".")[0] for x in os.listdir(record_directory) if x[-3:] == "edf"])[:subjects]
 
+    # Create the channel map object
+    logger.info("Creating channel map (if it does not exist)...")
+    channel_map = get_channel_mapper(get_edf_list(data_dir), channels)
+
+    # Split records
     records_splits = [list(s) for s in np.array_split(records, splits)]
 
     with parallel_backend("loky", inner_max_num_threads=2):
@@ -254,6 +263,7 @@ def process_shhs(
                 annotation_directory,
                 output_dir,
                 fs,
+                channel_map,
                 *args,
                 **kwargs,
             )
