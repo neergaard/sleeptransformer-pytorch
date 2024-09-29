@@ -39,7 +39,7 @@ emg_filter = ButterworthFilter(order=4, fc=[10], type="highpass")
 #     with open(signal_labels_json_path, "r") as (f):
 #         channel_dict = json.load(f)
 #     # channel_categories = channel_dict["categories"]
-    # channel_categories = ["C4"]
+# channel_categories = ["C4"]
 channel_filters = {
     "C3": eeg_filter,
     "C4": eeg_filter,
@@ -103,7 +103,7 @@ def process_file(
             verbose=False,
             include=[ch for ch in labels if ch in channel_map[k]],
         )
-        for k in channel_map['categories']
+        for k in channel_map["categories"]
     }
 
     try:
@@ -200,9 +200,7 @@ def process_file(
     N, C, T = X.shape
     assert C == 1, f"This currently only works for single EEG, got C={C}."
     if transform == "stft":
-        transformer = transforms.STFTTransform(
-            fs=output_fs, segment_size=2 * output_fs, step_size=output_fs, nfft=256
-        )
+        transformer = transforms.STFTTransform(fs=output_fs, segment_size=2 * output_fs, step_size=output_fs, nfft=256)
         X = transformer(X)
 
     # Write to H5
@@ -250,7 +248,7 @@ def process_shhs(
 
     # Create the channel map object
     logger.info("Creating channel map (if it does not exist)...")
-    channel_map = get_channel_mapper(get_edf_list(data_dir), channels)
+    channel_map = get_channel_mapper(channel_labels=channels, data_dir=data_dir)
 
     # Split records
     records_splits = [list(s) for s in np.array_split(records, splits)]
