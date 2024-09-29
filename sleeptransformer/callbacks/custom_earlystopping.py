@@ -1,5 +1,7 @@
+from typing import Any, Mapping
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks import EarlyStopping
+from torch import Tensor
 
 
 class CustomEarlyStopping(EarlyStopping):
@@ -33,15 +35,29 @@ class CustomEarlyStopping(EarlyStopping):
         )
         self.begin_after = begin_after
         self.counter = 0
+        self.run_early_stopping = False
 
-    def on_train_epoch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule) -> None:
-        self.counter += 1
-        if self.counter > self.begin_after:
-            return super().on_train_epoch_end(trainer, pl_module)
+    def on_train_batch_end(
+        self,
+        trainer: pl.Trainer,
+        pl_module: pl.LightningModule,
+        outputs: Tensor | Mapping[str, Any] | None,
+        batch: Any,
+        batch_idx: int,
+    ) -> None:
+        if not self.run_early_stopping and trainer.global_step > self.begin_after:
+            self.run_early_stopping = True
+        return super().on_train_batch_end(trainer, pl_module, outputs, batch, batch_idx)
+
+    # def on_train_epoch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule) -> None:
+    # self.counter += 1
+    # if self.counter > self.begin_after:
+    #     return super().on_train_epoch_end(trainer, pl_module)
 
     def on_validation_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule) -> None:
-        if trainer.sanity_checking:
-            return
-        self.counter += 1
-        if self.counter > self.begin_after:
+        if self.run_early_stopping:
             return super().on_validation_end(trainer, pl_module)
+        # if trainer.sanity_checking:
+        #     return
+        # self.counter += 1
+        # if self.counter > self.begin_after:
