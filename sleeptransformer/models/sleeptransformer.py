@@ -48,9 +48,21 @@ class SleepTransformer(BaseModel):
         self.train_metrics = torchmetrics.MetricCollection([
             torchmetrics.Accuracy(task="multiclass", num_classes=n_classes)
         ], prefix='train_')
+        self.train_class_metrics = torchmetrics.MetricCollection([
+            torchmetrics.ConfusionMatrix(task="multiclass", num_classes=n_classes),
+            torchmetrics.F1Score(task="multiclass", num_classes=n_classes, average=None),
+            torchmetrics.Recall(task='multiclass', num_classes=n_classes, average=None),
+            torchmetrics.Precision(task='multiclass', num_classes=n_classes, average=None)
+        ])
         self.eval_metrics = torchmetrics.MetricCollection([
             torchmetrics.Accuracy(task="multiclass", num_classes=n_classes)
         ], prefix='eval_')
+        self.eval_class_metrics = torchmetrics.MetricCollection([
+            torchmetrics.ConfusionMatrix(task="multiclass", num_classes=n_classes),
+            torchmetrics.F1Score(task="multiclass", num_classes=n_classes, average=None),
+            torchmetrics.Recall(task='multiclass', num_classes=n_classes, average=None),
+            torchmetrics.Precision(task='multiclass', num_classes=n_classes, average=None)
+        ])
         self.test_metrics = torchmetrics.MetricCollection([
             torchmetrics.Accuracy(task="multiclass", num_classes=n_classes),
             torchmetrics.CohenKappa(task="multiclass", num_classes=n_classes),
@@ -106,6 +118,7 @@ class SleepTransformer(BaseModel):
         N, *_ = batch["data"].shape
         loss, z, t = self.shared_step(batch["data"], batch["targets"])
         log_output = self.train_metrics(z.argmax(-1), t)
+        self.train_class_metrics(z.argmax(-1), t)
         self.log("loss/train", loss, on_step=True, on_epoch=True, prog_bar=True, batch_size=N)
         self.log_dict(
             log_output,
@@ -120,6 +133,7 @@ class SleepTransformer(BaseModel):
         N, *_ = batch["data"].shape
         loss, z, t = self.shared_step(batch["data"], batch["targets"])
         log_output = self.eval_metrics(z.argmax(-1), t)
+        self.eval_class_metrics(z.argmax(-1), t)
         self.log("loss/eval", loss, on_step=False, on_epoch=True, prog_bar=True, batch_size=N)
         self.log_dict(
             log_output,
@@ -137,11 +151,11 @@ class SleepTransformer(BaseModel):
         self.test_class_metrics(z.argmax(-1), t)
         self.log_dict(log_output, on_step=False, on_epoch=True, batch_size=N)
 
-    def on_test_epoch_end(self) -> None:
-        cm = self.test_class_metrics["MulticlassConfusionMatrix"].compute().cpu().numpy()
-        f1 = self.test_class_metrics["MulticlassF1Score"].compute().cpu().numpy()
-        recall = self.test_class_metrics["MulticlassRecall"].compute().cpu().numpy()
-        precision = self.test_class_metrics["MulticlassPrecision"].compute().cpu().numpy()
+    def _summarize_results(self, metrics: torchmetrics.MetricCollection) -> None:
+        cm = metrics["MulticlassConfusionMatrix"].compute().cpu().numpy()
+        f1 = metrics["MulticlassF1Score"].compute().cpu().numpy()
+        recall = metrics["MulticlassRecall"].compute().cpu().numpy()
+        precision = metrics["MulticlassPrecision"].compute().cpu().numpy()
         # f1 = self.tes
         logger.info("Overall confusion matrix (row - true W, N1, N2, N3, REM; col - pred W, N1, N2, N3, REM)")
         logger.info(cm)
@@ -151,6 +165,14 @@ class SleepTransformer(BaseModel):
         logger.info(f"Class-specific recall score: {recall_str}")
         precision_str = ", ".join([f"{s1}: {s2:.3f}" for s1, s2 in zip(["W", "N1", "N2", "N3", "R"], precision)])
         logger.info(f"Class-specific precision score: {precision_str}")
+
+    def on_train_end(self) -> None:
+        self._summarize_results(self.train_class_metrics)
+        self._summarize_results(self.eval_class_metrics)
+        return super().on_train_end()
+
+    def on_test_epoch_end(self) -> None:
+        self._summarize_results(self.test_class_metrics)
         return super().on_test_epoch_end()
 
     def configure_optimizers(self):
