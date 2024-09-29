@@ -149,16 +149,15 @@ def channel_mapper(
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("-d", "--data_dir", required=True, type=str, help="Location of EDF(s) to check")
+    parser.add_argument("-d", "--data-dir", required=True, type=Path, help="Location of EDF(s) to check")
     parser.add_argument(
         "-o",
-        "--json_filename",
+        "--json-filename",
         type=str,
         help="Location of the output JSON file containing channel mappings",
     )
     parser.add_argument("-c", "--channels", required=True, nargs="+", help="List of channels to map")
+    parser.add_argument("--force-new", default=False, help="Overwrite old file (default: False).")
     args = parser.parse_args()
 
-    edf_list = get_edf_list(args.data_dir)
-
-    channel_mapper(edf_list, args.channels, args.json_filename)
+    channel_mapper(args.channels, data_dir=args.data_dir, json_filename=args.json_filename, force=args.force_new)
